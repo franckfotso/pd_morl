@@ -1,21 +1,25 @@
+from typing import List
+import numpy.typing as npt
 import numpy as np
 import torch
 import itertools
 import matplotlib.pyplot as plt
-from sklearn.metrics.pairwise import euclidean_distances
-from pymoo.factory import get_performance_indicator
+# from sklearn.metrics.pairwise import euclidean_distances
+# from pymoo.factory import get_performance_indicator
+from pymoo.indicators.hv import HV
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 
+
 def real_pareto_cal(args):
-    if args.scenario_name == 'dst-v0':
+    if args['scenario_name'] == 'dst-v0':
         time = [-1, -3, -5, -7, -8, -9, -13, -14, -17, -19]
         treasure = [0.7, 8.2, 11.5, 14., 15.1, 16.1, 19.6, 20.3, 22.4, 23.7]
         
         # apply discount
-        dst_time = (-(1 - np.power(args.gamma, -np.asarray(time))) / (1 - args.gamma)).tolist()
-        dst_treasure = (np.power(args.gamma, -np.asarray(time) - 1) * np.asarray(treasure)).tolist()
+        dst_time = (-(1 - np.power(args['gamma'], -np.asarray(time))) / (1 - args['gamma'])).tolist()
+        dst_treasure = (np.power(args['gamma'], -np.asarray(time) - 1) * np.asarray(treasure)).tolist()
         return dst_time, dst_treasure
-    if args.scenario_name == 'ftn-v0':
+    if args['scenario_name'] == 'ftn-v0':
         # Add data
         FRUITS_DICT = {'6': 
                    [[0.26745039, 3.54435815, 4.39088762, 0.5898826, 7.7984232, 2.63110921],
@@ -245,7 +249,7 @@ def real_pareto_cal(args):
                     [  7.79480886,  4.68269928,  3.85253341,  0.20850008,   1.55792871,  0.02558407],  
                     [  1.68967122,  1.11253309,  3.74425011,  3.12606095,   3.20780397,  7.86292624]]
                 }
-        FRUITS = np.array(FRUITS_DICT[str(args.depth)]) * np.power(args.gamma, args.depth-1)
+        FRUITS = np.array(FRUITS_DICT[str(args['depth'])]) * np.power(args['gamma'], args['depth']-1)
         return FRUITS
     
 def find_in_dst(A, B, base=0):
@@ -316,7 +320,7 @@ def compute_sparsity(obj_batch):
 def generate_w_batch_test(args, step_size):
     mesh_array = []
     step_size = step_size
-    for i in range(args.reward_size):
+    for i in range(args['reward_size']):
         mesh_array.append(np.arange(0,1+step_size, step_size))
         
     w_batch_test = np.array(list(itertools.product(*mesh_array)))
@@ -331,33 +335,46 @@ def plot_objs(args,objs,ext=''):
     plt.plot(objs_plot[:,0],objs_plot[:,1],'rs', markersize=2)
     plt.xlabel("Speed")
     plt.ylabel("Energy Efficiency")
-    plt.title('{} - Pareto Front'.format(args.scenario_name))
-    if args.scenario_name == "MO-Walker2d-v2":
+    plt.title('{} - Pareto Front'.format(args['scenario_name']))
+    if args['scenario_name'] == "MO-Walker2d-v2":
         plt.ylim(0, 2700)
         plt.xlim(0, 2700)
-    elif args.scenario_name == "MO-HalfCheetah-v2":
+    elif args['scenario_name'] == "MO-HalfCheetah-v2":
         plt.ylim(0, 2700)
         plt.xlim(0, 2700)
-    elif args.scenario_name == "MO-Ant-v2":
+    elif args['scenario_name'] == "MO-Ant-v2":
         plt.ylim(0, 3700)
         plt.xlim(0, 3400)
-    elif args.scenario_name == "MO-Swimmer-v2":
+    elif args['scenario_name'] == "MO-Swimmer-v2":
         plt.ylim(0, 300)
         plt.xlim(0, 300)
-    elif args.scenario_name == "MO-Hopper-v2":
+    elif args['scenario_name'] == "MO-Hopper-v2":
         plt.ylim(0, 6000)
         plt.xlim(0, 5000)
-    plt.savefig('Figures/{}/{}-ParetoFront, ExpNoise={}, PolicyUpdateFreq={}_{}.png'.format(args.scenario_name,args.plot_name,args.expl_noise,args.policy_freq,ext))
+    plt.savefig('Figures/{}/{}-ParetoFront, ExpNoise={}, PolicyUpdateFreq={}_{}.png'.format(args['scenario_name'], args['plot_name'], args['expl_noise'], args['policy_freq'], ext))
     plt.close()
+
+
+def cal_hypervolume(ref_point: np.ndarray, points: List[npt.ArrayLike]) -> float:
+    """Computes the hypervolume metric for a set of points (value vectors) and a reference point (from Pymoo).
+
+    Args:
+        ref_point (np.ndarray): Reference point
+        points (List[np.ndarray]): List of value vectors
+
+    Returns:
+        float: Hypervolume metric
+    """
+    return HV(ref_point=ref_point * -1)(np.array(points) * -1)
     
 
 # Evaluate agent druing training 
 def eval_agent(test_env, agent, w_batch, args, eval_episodes=1):
     
-    use_cuda = args.cuda
+    use_cuda = args['cuda']
     FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
     hypervolume,  sparsity = np.zeros((eval_episodes,)), np.zeros((eval_episodes,))
-    objs = np.zeros((eval_episodes,len(w_batch),args.reward_size))
+    objs = np.zeros((eval_episodes, len(w_batch), args['reward_size']))
     for eval_ep in range(eval_episodes):
         test_env.seed(eval_ep*11)
         test_env.action_space.seed(eval_ep*11)
@@ -388,9 +405,12 @@ def eval_agent(test_env, agent, w_batch, args, eval_episodes=1):
             if hasattr(agent, 'deterministic'): 
                 agent.reset_preference()
         recovered_objs = np.array(recovered_objs)
+
         # Compute hypervolume and sparsity
-        perf_ind = get_performance_indicator("hv", ref_point = np.zeros((recovered_objs.shape[1])))
-        hv = perf_ind.do(-recovered_objs)
+        # perf_ind = get_performance_indicator("hv", ref_point = np.zeros((recovered_objs.shape[1])))
+        # hv = perf_ind.do(-recovered_objs)
+        hv = cal_hypervolume(np.zeros((recovered_objs.shape[1])), recovered_objs)
+
         s = compute_sparsity(-recovered_objs)
         hypervolume[eval_ep] = hv
         sparsity[eval_ep] = s
@@ -400,10 +420,10 @@ def eval_agent(test_env, agent, w_batch, args, eval_episodes=1):
 # Evaluate agent after training
 def eval_agent_test(test_env, agent, w_batch, args, eval_episodes=1):
     
-    use_cuda = args.cuda
+    use_cuda = args['cuda']
     FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
     hypervolume,  sparsity = np.zeros((eval_episodes,)), np.zeros((eval_episodes,))
-    objs = np.zeros((eval_episodes,len(w_batch),args.reward_size))
+    objs = np.zeros((eval_episodes,len(w_batch), args['reward_size']))
     for eval_ep in range(eval_episodes):
         test_env.seed(eval_ep*11)
         test_env.action_space.seed(eval_ep*11)
@@ -435,10 +455,13 @@ def eval_agent_test(test_env, agent, w_batch, args, eval_episodes=1):
             if hasattr(agent, 'deterministic'): 
                 agent.reset_preference()
             print("Preference %d out of %d Preferences" % (pref_cnt, len(w_batch)))
+        
         # Compute hypervolume and sparsity
         recovered_objs = np.array(recovered_objs)
-        perf_ind = get_performance_indicator("hv", ref_point = np.zeros((recovered_objs.shape[1])))
-        hv = perf_ind.do(-recovered_objs)
+        # perf_ind = get_performance_indicator("hv", ref_point = np.zeros((recovered_objs.shape[1])))
+        # hv = perf_ind.do(-recovered_objs)
+        hv = cal_hypervolume(np.zeros((recovered_objs.shape[1])), recovered_objs)
+
         s = compute_sparsity(-recovered_objs)
         hypervolume[eval_ep] = hv
         sparsity[eval_ep] = s
@@ -448,9 +471,9 @@ def eval_agent_test(test_env, agent, w_batch, args, eval_episodes=1):
 # Evaluation for interpolator update
 def eval_agent_interp(test_env, agent, w_batch, args, eval_episodes=1):
     
-    use_cuda = args.cuda
+    use_cuda = args['cuda']
     FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
-    objs = np.zeros((eval_episodes,len(w_batch),args.reward_size))
+    objs = np.zeros((eval_episodes,len(w_batch),args['reward_size']))
     for eval_ep in range(eval_episodes):
         test_env.seed(eval_ep*11)
         test_env.action_space.seed(eval_ep*11)
@@ -488,7 +511,7 @@ def eval_agent_interp(test_env, agent, w_batch, args, eval_episodes=1):
 
 def eval_agent_discrete(env, agent, w_batch, args, metric_calc=True):
     
-    use_cuda = args.cuda
+    use_cuda = args['cuda']
     FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
     
     # compute recovered Pareto
@@ -510,16 +533,16 @@ def eval_agent_discrete(env, agent, w_batch, args, metric_calc=True):
                 else:
                     action = agent(state, evalPreference)
                 next_state, reward, terminal, _ = env.step(action)
-                tot_rewards += reward * np.power(args.gamma, cnt)
+                tot_rewards += reward * np.power(args['gamma'], cnt)
                 cnt += 1
-                if cnt > args.max_episode_len:
+                if cnt > args['max_episode_len']:
                     terminal = True
                 state = next_state
             recovered_objs.append(tot_rewards)
         if hasattr(agent, 'deterministic'): 
             agent.reset_preference()
         #Obtain coverage ratio f1 score for DeepSeaTreasure
-        if args.scenario_name == 'dst-v0':
+        if args['scenario_name'] == 'dst-v0':
             time, treasure = real_pareto_cal(args) # Compute actual pareto curve
             objs = np.vstack(recovered_objs)
             true_obj = np.vstack((treasure,time))
@@ -538,13 +561,15 @@ def eval_agent_discrete(env, agent, w_batch, args, metric_calc=True):
             objs_tmp = objs_tmp + objs
 
             # Compute hypervolume and sparsity
-            hv = get_performance_indicator("hv", ref_point = np.array([0, 0]))
-            hypervolume = hv.do(-objs_tmp)
+            # hv = get_performance_indicator("hv", ref_point = np.array([0, 0]))
+            # hypervolume = hv.do(-objs_tmp)
+            hypervolume = cal_hypervolume(np.array([0, 0]), objs_tmp)
+
             sparsity = compute_sparsity(-objs_tmp)
 
             return CR_F1, hypervolume, sparsity, objs
         #Obtain coverage ratio f1 score for FruitTaskNavigation
-        if args.scenario_name == 'ftn-v0':
+        if args['scenario_name'] == 'ftn-v0':
             true_obj = real_pareto_cal(args) # Compute actual pareto curve
             objs = np.array(recovered_objs)
             cnt1, cnt2 = find_in_ftn(objs, true_obj, 0.0)
@@ -559,8 +584,10 @@ def eval_agent_discrete(env, agent, w_batch, args, metric_calc=True):
                 CR_F1 = 0           
             # Compute hypervolume and sparsity    
             if metric_calc == True:
-                hv = get_performance_indicator("hv", ref_point = np.zeros((objs.shape[1])))
-                hypervolume = hv.do(-objs)
+                # hv = get_performance_indicator("hv", ref_point = np.zeros((objs.shape[1])))
+                # hypervolume = hv.do(-objs)
+                hypervolume = cal_hypervolume(np.zeros((objs.shape[1])), objs)
+
                 sparsity = compute_sparsity(-objs)
             else:
                 sparsity = 0
@@ -569,7 +596,7 @@ def eval_agent_discrete(env, agent, w_batch, args, metric_calc=True):
     
 
 def store_results(CR_F1, hypervolume, sparsity, time_metric, writer, args):
-        if args.scenario_name == "MO-Walker2d-v2" or args.scenario_name == "MO-HalfCheetah-v2" or args.scenario_name == "MO-Swimmer-v2" or args.scenario_name == "MO-Ant-v2"  or args.scenario_name == "MO-Hopper-v2":
+        if args['scenario_name'] == "MO-Walker2d-v2" or args['scenario_name'] == "MO-HalfCheetah-v2" or args['scenario_name'] == "MO-Swimmer-v2" or args['scenario_name'] == "MO-Ant-v2"  or args['scenario_name'] == "MO-Hopper-v2":
             print("Time Step %d Hypervolume %0.2f; Sparsity %0.2f" % (time_metric, hypervolume, sparsity))
             writer.add_scalar("Evaluation Metric/Hypervolume", hypervolume, time_metric)
             writer.add_scalar("Evaluation Metric/Sparsity", sparsity, time_metric)

@@ -24,11 +24,11 @@ class MO_DDQN(nn.Module):
 
 
         self.args = args
-        self.state_size = args.obs_shape
-        self.action_size = args.action_shape
-        self.reward_size = args.reward_size
-        self._layer_N = args.layer_N
-        self.hidden_size = args.hidden_size
+        self.state_size = args['obs_shape']
+        self.action_size = args['action_shape']
+        self.reward_size = args['reward_size']
+        self._layer_N = args['layer_N']
+        self.hidden_size = args['hidden_size']
         
                    
         
@@ -63,11 +63,11 @@ class Actor(nn.Module):
     def __init__(self, args):
         super(Actor,self).__init__()
         self.args = args
-        self.state_size = args.obs_shape
-        self.action_size = args.action_shape
-        self.reward_size = args.reward_size
-        self._layer_N = args.layer_N_actor
-        self.hidden_size = args.hidden_size
+        self.state_size = args['obs_shape']
+        self.action_size = args['action_shape']
+        self.reward_size = args['reward_size']
+        self._layer_N = args['layer_N_actor']
+        self.hidden_size = args['hidden_size']
         
         
         
@@ -82,7 +82,7 @@ class Actor(nn.Module):
         self.affine_hid.apply(init_weights)
         self.affine_out.apply(init_weights)
         
-        self.max_action = torch.FloatTensor(args.max_action).to(self.args.device)
+        self.max_action = torch.FloatTensor(args['max_action']).to(self.args['device'])
         
     def forward(self, state, preference):
         
@@ -101,11 +101,11 @@ class Critic(nn.Module):
         super(Critic,self).__init__()
         
         self.args = args
-        self.state_size = args.obs_shape
-        self.action_size = args.action_shape
-        self.reward_size = args.reward_size
-        self._layer_N = args.layer_N_critic
-        self.hidden_size = args.hidden_size
+        self.state_size = args['obs_shape']
+        self.action_size = args['action_shape']
+        self.reward_size = args['reward_size']
+        self._layer_N = args['layer_N_critic']
+        self.hidden_size = args['hidden_size']
         
         
         # Q1 architecture
@@ -131,7 +131,7 @@ class Critic(nn.Module):
         self.affine_hid_2.apply(init_weights)
         self.affine_out_2.apply(init_weights)
         
-        self.max_action = torch.FloatTensor(args.max_action).to(self.args.device)
+        self.max_action = torch.FloatTensor(args['max_action']).to(self.args['device'])
         
     def forward(self, state, preference, action):
         
@@ -173,11 +173,11 @@ class EnvelopeLinearCQN_default(nn.Module):
 
 
         self.args = args
-        self.state_size = args.obs_shape
-        self.action_size = args.action_shape
-        self.reward_size = args.reward_size
-        self._layer_N = args.layer_N
-        self.hidden_size = args.hidden_size
+        self.state_size = args['obs_shape']
+        self.action_size = args['action_shape']
+        self.reward_size = args['reward_size']
+        self._layer_N = args['layer_N']
+        self.hidden_size = args['hidden_size']
         
         
         self.affine1 = nn.Linear(self.state_size + self.reward_size,
