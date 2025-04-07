@@ -249,7 +249,7 @@ class MO_TD3_HER:
        
         # Choose action for a given policy 
         if not deterministic:
-            actions = self.actor(states.unsqueeze(0), preference.unsqueeze(0)).cpu().numpy().flatten()
+            actions = self.actor(states.unsqueeze(0), preference.unsqueeze(0)).cpu().data.numpy().flatten()
             # TD3 Exploration
             actions = (actions + np.random.normal(0,self.max_action*self.expl_noise,size=self.action_size)).clip(-self.max_action,self.max_action)
         else:
