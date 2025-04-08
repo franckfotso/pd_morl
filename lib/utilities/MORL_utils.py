@@ -371,20 +371,20 @@ def eval_agent(test_env, agent, w_batch, args, eval_episodes=1):
     for eval_ep in range(eval_episodes):
         # print('-'*50)
         print('Evaluating episode %d out of %d' % (eval_ep+1, eval_episodes))
-        eps_seed = eval_ep*11
-        test_env.seed = eps_seed
-        test_env.action_space.seed(eps_seed)
-        torch.manual_seed(eps_seed)
-        np.random.seed(eps_seed)    
+        # eps_seed = eval_ep*11
+        # test_env.seed = eps_seed
+        # test_env.action_space.seed(eps_seed)
+        # torch.manual_seed(eps_seed)
+        # np.random.seed(eps_seed)    
         
         recovered_objs = []
         # Evaluate agent for the preferences in w_batch
         for i, evalPreference in enumerate(w_batch):
-            # eps_seed = eval_ep*11+i
-            # test_env.seed = eps_seed
-            # test_env.action_space.seed(eps_seed)
-            # torch.manual_seed(eps_seed)
-            # np.random.seed(eps_seed)
+            eps_seed = eval_ep*11+i
+            test_env.seed = eps_seed
+            test_env.action_space.seed(eps_seed)
+            torch.manual_seed(eps_seed)
+            np.random.seed(eps_seed)
 
             # print('Processing preference %d out of %d' % (i+1, len(w_batch)))
             evalPreference = np.abs(evalPreference) / np.linalg.norm(evalPreference, ord=1, axis=0, keepdims=True)
